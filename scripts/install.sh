@@ -1,0 +1,81 @@
+#!/bin/bash
+# SPT + Fika Pterodactyl installer
+# Runs in: debian:bookworm-slim
+# Server files destination: /mnt/server (= /home/container at runtime)
+
+SPT_DIR=/mnt/server/SPT
+SPT_VERSION=${SPT_VERSION:-4.0.13-40087-2891fd4}
+FIKA_VERSION=${FIKA_VERSION:-2.2.6}
+FIKA_MODE=${FIKA_MODE:-disabled}
+LISTEN_ALL_NETWORKS=${LISTEN_ALL_NETWORKS:-true}
+
+echo "=== SPT + Fika Installer ==="
+echo "SPT_VERSION=$SPT_VERSION"
+echo "FIKA_MODE=$FIKA_MODE"
+echo "FIKA_VERSION=$FIKA_VERSION"
+echo "LISTEN_ALL_NETWORKS=$LISTEN_ALL_NETWORKS"
+echo ""
+
+# Install required tools
+echo "Installing tools..."
+apt-get update -y -q
+apt-get install -y -q --no-install-recommends \
+    curl \
+    jq \
+    p7zip-full \
+    unzip \
+    libimage-exiftool-perl
+echo "Tools installed"
+
+# Install SPT if not already present
+# SPT archive extracts with a top-level SPT/ directory, so binary lands at /mnt/server/SPT/SPT.Server.Linux
+if [[ -f "$SPT_DIR/SPT.Server.Linux" ]]; then
+    echo "SPT server binary found at $SPT_DIR, skipping download"
+else
+    echo "Downloading SPT $SPT_VERSION..."
+    mkdir -p /mnt/server
+    cd /tmp
+    curl -L "https://spt-releases.modd.in/SPT-${SPT_VERSION}.7z" -o spt.7z
+    7za x spt.7z -o/mnt/server
+    rm spt.7z
+    mkdir -p "$SPT_DIR/user/mods" "$SPT_DIR/user/profiles"
+    echo "SPT installed to $SPT_DIR"
+fi
+
+# Install Fika server mod if requested and not already present
+FIKA_MOD_DIR=$SPT_DIR/user/mods/fika-server
+if [[ "$FIKA_MODE" == "install" || "$FIKA_MODE" == "auto-update" ]]; then
+    if [[ -d "$FIKA_MOD_DIR" ]]; then
+        echo "Fika server mod already present at $FIKA_MOD_DIR, skipping download"
+    else
+        echo "Downloading Fika server mod $FIKA_VERSION..."
+        FIKA_ARTIFACT=Fika.Server.Release.$FIKA_VERSION.zip
+        FIKA_URL="https://github.com/project-fika/Fika-Server-CSharp/releases/download/v${FIKA_VERSION}/${FIKA_ARTIFACT}"
+        mkdir -p "$SPT_DIR/user/mods"
+        cd /tmp
+        curl -L "$FIKA_URL" -o "$FIKA_ARTIFACT"
+        unzip -q "$FIKA_ARTIFACT" -d /tmp/fika_temp/
+        mv /tmp/fika_temp/SPT/user/mods/fika-server "$FIKA_MOD_DIR"
+        rm -rf /tmp/fika_temp "/tmp/$FIKA_ARTIFACT"
+        echo "Fika server mod installed to $FIKA_MOD_DIR"
+    fi
+fi
+
+# Patch http.json for listen-on-all-interfaces if the config file exists
+HTTP_JSON=$SPT_DIR/SPT_Data/configs/http.json
+if [[ "$LISTEN_ALL_NETWORKS" == "true" && -f "$HTTP_JSON" ]]; then
+    echo "Configuring SPT to listen on all network interfaces"
+    modified=$(jq '.ip = "0.0.0.0" | .backendIp = "0.0.0.0"' "$HTTP_JSON")
+    echo -E "$modified" > "$HTTP_JSON"
+fi
+
+# Write startup.sh — build.py replaces __STARTUP_SH__ with scripts/startup.sh content
+echo "Writing /mnt/server/startup.sh..."
+cat > /mnt/server/startup.sh << 'STARTUP_SCRIPT_EOF'
+__STARTUP_SH__
+STARTUP_SCRIPT_EOF
+chmod +x /mnt/server/startup.sh
+echo "startup.sh written"
+
+echo ""
+echo "=== Installation complete ==="
