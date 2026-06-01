@@ -261,19 +261,24 @@ validate() {
 # -----------------------------------------------------------------------
 
 spt_listen_on_all_networks() {
+    local server_port=${SERVER_PORT:-6969}
     local http_json=$SPT_DATA_DIR/configs/http.json
     if [[ ! -f $http_json ]]; then
-        echo "WARNING: $http_json not found, skipping LISTEN_ALL_NETWORKS config"
+        echo "WARNING: $http_json not found, skipping network config"
         return
     fi
     local modified
-    modified="$(jq '.ip = "0.0.0.0" | .backendIp = "0.0.0.0"' "$http_json")"
+    modified="$(jq --arg port "$server_port" \
+        '.ip = "0.0.0.0" | .backendIp = "0.0.0.0" | .port = ($port | tonumber) | .backendPort = ($port | tonumber)' \
+        "$http_json")"
     echo -E "${modified}" > "$http_json"
+    echo "SPT server configured to listen on 0.0.0.0:$server_port"
 
     if [[ -f "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH" ]]; then
-        echo "Applying LISTEN_ALL_NETWORKS to Fika config"
+        echo "Applying network config to Fika config"
         local modified_fika
-        modified_fika="$(jq '.server.SPT.http.ip = "0.0.0.0" | .server.SPT.http.backendIp = "0.0.0.0"' \
+        modified_fika="$(jq --arg port "$server_port" \
+            '.server.SPT.http.ip = "0.0.0.0" | .server.SPT.http.backendIp = "0.0.0.0" | .server.SPT.http.port = ($port | tonumber) | .server.SPT.http.backendPort = ($port | tonumber)' \
             "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH")"
         echo -E "${modified_fika}" > "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH"
     fi

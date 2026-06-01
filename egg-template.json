@@ -158,6 +158,16 @@
             "user_editable": true,
             "rules": "nullable|string|max:50",
             "field_type": "text"
+        },
+        {
+            "name": "Server Port",
+            "description": "The port SPT server listens on inside the container. Must match the Pterodactyl allocation assigned to this server. Pterodactyl sets this automatically.",
+            "env_variable": "SERVER_PORT",
+            "default_value": "6969",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": "required|numeric|between:1024,65535",
+            "field_type": "text"
         }
     ]
 }
