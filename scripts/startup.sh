@@ -418,12 +418,16 @@ BACKUP_SCRIPT_EOF
 }
 
 set_timezone() {
-    if [[ -n "${TZ}" ]]; then
-        echo "$TZ" > /etc/timezone 2>/dev/null || true
-    else
+    # /etc is read-only in the Pterodactyl container; only set what we can.
+    # .NET/SPT honour the TZ environment variable, so exporting it is sufficient.
+    if [[ -z "${TZ}" ]]; then
         TZ=$(cat /etc/timezone 2>/dev/null || echo "UTC")
     fi
-    ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime 2>/dev/null || true
+    export TZ
+    # Best-effort: only attempt /etc writes if that path is writable (it usually is not)
+    if [[ -w /etc/timezone ]]; then echo "$TZ" > /etc/timezone; fi
+    if [[ -w /etc ]]; then ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime 2>/dev/null || true; fi
+    echo "Timezone: $TZ"
 }
 
 # -----------------------------------------------------------------------
