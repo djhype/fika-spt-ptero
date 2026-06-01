@@ -63,10 +63,10 @@
             "name": "Auto Update SPT",
             "description": "Automatically update SPT server files on startup if the installed version does not match SPT_VERSION.",
             "env_variable": "AUTO_UPDATE_SPT",
-            "default_value": "false",
+            "default_value": "0",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|boolean",
+            "rules": "required|in:0,1",
             "field_type": "text"
         },
         {
@@ -83,40 +83,40 @@
             "name": "Listen On All Networks",
             "description": "Set SPT server IP bindings to 0.0.0.0 so the server is reachable inside Pterodactyl. Should be true in almost all cases.",
             "env_variable": "LISTEN_ALL_NETWORKS",
-            "default_value": "true",
+            "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|boolean",
+            "rules": "required|in:0,1",
             "field_type": "text"
         },
         {
             "name": "Enable Profile Backup",
             "description": "Enable a daily cron job that backs up player profiles to the backups/profiles/ directory at midnight UTC.",
             "env_variable": "ENABLE_PROFILE_BACKUP",
-            "default_value": "true",
+            "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|boolean",
+            "rules": "required|in:0,1",
             "field_type": "text"
         },
         {
             "name": "Take Ownership",
             "description": "Kept for compatibility with upstream Docker image. Has no functional effect in Pterodactyl.",
             "env_variable": "TAKE_OWNERSHIP",
-            "default_value": "true",
+            "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|boolean",
+            "rules": "required|in:0,1",
             "field_type": "text"
         },
         {
             "name": "Change Permissions",
             "description": "Kept for compatibility with upstream Docker image. Has no functional effect in Pterodactyl.",
             "env_variable": "CHANGE_PERMISSIONS",
-            "default_value": "true",
+            "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|boolean",
+            "rules": "required|in:0,1",
             "field_type": "text"
         },
         {
@@ -133,10 +133,10 @@
             "name": "Install Other Mods",
             "description": "Enable automatic mod downloader. Downloads and installs mods from MOD_URLS_TO_DOWNLOAD or SPT/mods_download/mod_urls_to_download.txt on each startup.",
             "env_variable": "INSTALL_OTHER_MODS",
-            "default_value": "false",
+            "default_value": "0",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|boolean",
+            "rules": "required|in:0,1",
             "field_type": "text"
         },
         {
