@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 # SPT + Fika Pterodactyl installer
 # Runs in: debian:bookworm-slim
 # Server files destination: /mnt/server (= /home/container at runtime)
@@ -20,6 +20,7 @@ echo ""
 echo "Installing tools..."
 apt-get update -y -q
 apt-get install -y -q --no-install-recommends \
+    ca-certificates \
     curl \
     jq \
     p7zip-full \
@@ -69,7 +70,7 @@ if [[ "$LISTEN_ALL_NETWORKS" == "true" && -f "$HTTP_JSON" ]]; then
     echo -E "$modified" > "$HTTP_JSON"
 fi
 
-# Write startup.sh — build.py replaces __STARTUP_SH__ with scripts/startup.sh content
+# Write startup.sh — build.py inlines scripts/startup.sh here at build time
 echo "Writing /mnt/server/startup.sh..."
 cat > /mnt/server/startup.sh << 'STARTUP_SCRIPT_EOF'
 __STARTUP_SH__
