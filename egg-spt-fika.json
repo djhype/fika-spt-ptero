@@ -4,7 +4,7 @@
         "version": "PTDL_v2",
         "update_url": null
     },
-    "exported_at": "2026-06-01T22:05:31+00:00",
+    "exported_at": "2026-06-01T22:06:40+00:00",
     "name": "SPT + Fika",
     "author": "theboss@ericisaboss.com",
     "uuid": "a8c48cba-6abc-4d5e-8d2f-1a2b3c4d5e6f",
@@ -66,7 +66,7 @@
             "default_value": "0",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|in:0,1",
+            "rules": "required|boolean",
             "field_type": "text"
         },
         {
@@ -86,7 +86,7 @@
             "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|in:0,1",
+            "rules": "required|boolean",
             "field_type": "text"
         },
         {
@@ -96,7 +96,7 @@
             "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|in:0,1",
+            "rules": "required|boolean",
             "field_type": "text"
         },
         {
@@ -106,7 +106,7 @@
             "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|in:0,1",
+            "rules": "required|boolean",
             "field_type": "text"
         },
         {
@@ -116,7 +116,7 @@
             "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|in:0,1",
+            "rules": "required|boolean",
             "field_type": "text"
         },
         {
@@ -136,7 +136,7 @@
             "default_value": "0",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|in:0,1",
+            "rules": "required|boolean",
             "field_type": "text"
         },
         {
