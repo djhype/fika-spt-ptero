@@ -292,13 +292,13 @@ BACKUP_SCRIPT_EOF
 
 set_timezone() {
     if [[ -n "${TZ}" ]]; then
-        echo $TZ > /etc/timezone
+        echo "$TZ" > /etc/timezone
     else
         local before_hour
         before_hour=$(date +"%H")
         TZ=$(cat /etc/timezone)
     fi
-    ln -sf /usr/share/zoneinfo/$TZ /etc/localtime
+    ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime
     if [[ ${before_hour:-} != $(date +"%H") ]]; then
         echo "Timezone set to $TZ"
     fi
