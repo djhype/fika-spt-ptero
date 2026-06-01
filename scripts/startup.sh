@@ -297,7 +297,104 @@ set_num_headless_profiles() {
 
 install_requested_mods() {
     echo "Downloading and installing other mods"
-    /usr/bin/download_unzip_install_mods "$SPT_DIR"
+    # Best-effort: never abort server startup because a mod failed to download/extract.
+    set +e
+
+    local mod_dl_dir=$SPT_DIR/mod_download
+    local remains_dir=$mod_dl_dir/remains
+    local urls_file=$mod_dl_dir/mod_urls_to_download.txt
+    local downloaded_file=$mod_dl_dir/mod_urls_downloaded.txt
+    local log_file=$mod_dl_dir/download_unzip_install_mods.log
+    local plugins_dir=$MOUNTED_DIR/BepInEx/plugins
+    local tmp_dir=/tmp/download_mods
+    local tmp_dl=$tmp_dir/downloaded
+    local tmp_ex=$tmp_dir/extracted
+
+    mkdir -p "$mod_dl_dir" "$tmp_dl" "$tmp_ex" "$SPT_DIR/user/mods"
+    touch "$urls_file" "$downloaded_file" "$log_file"
+    echo "Run $(date +'%d/%m/%Y %H:%M:%S')" >> "$log_file"
+
+    # Collect requested URLs from the env var and the file, skip already-downloaded ones
+    local all_urls=""
+    [[ -n "${MOD_URLS_TO_DOWNLOAD}" ]] && all_urls="$MOD_URLS_TO_DOWNLOAD"
+    if [[ -s "$urls_file" ]]; then
+        all_urls="$all_urls $(tr '\n' ' ' < "$urls_file")"
+    fi
+
+    local new_urls="" url
+    for url in $all_urls; do
+        [[ -z "$url" ]] && continue
+        grep -qF -- "$url" "$downloaded_file" && continue          # already downloaded
+        case " $new_urls " in *" $url "*) continue ;; esac          # dedup within this run
+        new_urls="$new_urls $url"
+    done
+
+    if [[ -z "${new_urls// }" ]]; then
+        echo "  No new mod URLs to download"
+        rm -rf "$tmp_dir"
+        set -e
+        return
+    fi
+
+    # Download each new URL with curl (-J -O honours content-disposition / URL filename)
+    for url in $new_urls; do
+        echo "  Downloading $url" | tee -a "$log_file"
+        if curl -sL -J -O --output-dir "$tmp_dl" "$url" >> "$log_file" 2>&1; then
+            echo "$url" >> "$downloaded_file"
+        else
+            echo "  WARNING: failed to download $url" | tee -a "$log_file"
+        fi
+    done
+
+    # Extract archives (.zip/.7z via 7zz, .tar* via tar)
+    shopt -s nullglob
+    local archive
+    for archive in "$tmp_dl"/*.zip "$tmp_dl"/*.7z; do
+        echo "  Extracting $(basename "$archive")" >> "$log_file"
+        7zz x "$archive" -o"$tmp_ex" -y >> "$log_file" 2>&1
+        rm -f "$archive"
+    done
+    for archive in "$tmp_dl"/*.tar "$tmp_dl"/*.tar.gz "$tmp_dl"/*.tgz; do
+        if command -v tar &>/dev/null; then
+            echo "  Extracting $(basename "$archive")" >> "$log_file"
+            tar -xf "$archive" -C "$tmp_ex" >> "$log_file" 2>&1
+            rm -f "$archive"
+        else
+            echo "  WARNING: tar unavailable; cannot extract $(basename "$archive")" | tee -a "$log_file"
+        fi
+    done
+
+    # Install extracted content to the correct locations
+    mkdir -p "$plugins_dir"
+    local f d
+    # loose .dll files -> BepInEx/plugins
+    for f in "$tmp_ex"/*.dll; do cp -f "$f" "$plugins_dir/"; rm -f "$f"; done
+    # BepInEx/plugins (handle capitalised Plugins too) -> BepInEx/plugins
+    for d in "$tmp_ex"/BepInEx/plugins "$tmp_ex"/BepInEx/Plugins; do
+        [[ -d "$d" ]] && cp -rf "$d"/. "$plugins_dir/"
+    done
+    rm -rf "$tmp_ex"/BepInEx
+    # SPT/ wrapper (contains user/mods etc.) -> merge into SPT dir
+    [[ -d "$tmp_ex/SPT" ]]  && { cp -rf "$tmp_ex"/SPT/.  "$SPT_DIR/";      rm -rf "$tmp_ex"/SPT; }
+    # bare user/ tree -> merge into SPT/user
+    [[ -d "$tmp_ex/user" ]] && { cp -rf "$tmp_ex"/user/. "$SPT_DIR/user/"; rm -rf "$tmp_ex"/user; }
+    # docs / executables -> server root
+    for f in "$tmp_ex"/*.txt "$tmp_ex"/*.md "$tmp_ex"/*.exe; do cp -f "$f" "$SPT_DIR/"; rm -f "$f"; done
+    # bare .dll downloads (not inside an archive) -> BepInEx/plugins
+    for f in "$tmp_dl"/*.dll; do cp -f "$f" "$plugins_dir/"; rm -f "$f"; done
+
+    # Anything we could not place -> mod_download/remains for manual handling
+    if [[ -n "$(ls -A "$tmp_ex" 2>/dev/null)" || -n "$(ls -A "$tmp_dl" 2>/dev/null)" ]]; then
+        mkdir -p "$remains_dir"
+        cp -rf "$tmp_ex"/. "$remains_dir/" 2>/dev/null
+        cp -rf "$tmp_dl"/. "$remains_dir/" 2>/dev/null
+        echo "  Some files could not be auto-installed; moved to mod_download/remains" | tee -a "$log_file"
+    fi
+    shopt -u nullglob
+
+    rm -rf "$tmp_dir"
+    echo "  Mod installation complete. Log: mod_download/download_unzip_install_mods.log"
+    set -e
 }
 
 start_crond() {
