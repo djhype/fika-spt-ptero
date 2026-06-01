@@ -41,7 +41,6 @@ FIKA_CONFIG_PATH=assets/configs/fika.jsonc
 FIKA_MOD_DIR=$SPT_DIR/user/mods/fika-server
 FIKA_ARTIFACT=Fika.Server.Release.$FIKA_VERSION.zip
 FIKA_RELEASE_URL="https://github.com/project-fika/Fika-Server-CSharp/releases/download/v$FIKA_VERSION/$FIKA_ARTIFACT"
-FIKA_REMOTE_SHA=$(curl -s "https://api.github.com/repos/project-fika/Fika-Server-CSharp/git/refs/tags/v$FIKA_VERSION" | grep -oP '"sha":\s*"\K[^"]+')
 
 # Other settings
 LISTEN_ALL_NETWORKS=${LISTEN_ALL_NETWORKS:-true}
@@ -217,12 +216,14 @@ validate() {
                 ;;
             install|auto-update)
                 local fika_local_sha=""
+                local fika_remote_sha
+                fika_remote_sha=$(curl -s "https://api.github.com/repos/project-fika/Fika-Server-CSharp/git/refs/tags/v$FIKA_VERSION" | grep -oP '"sha":\s*"\K[^"]+' || true)
                 if [[ -f "$FIKA_MOD_DIR/FikaServer.dll" ]]; then
                     fika_local_sha=$(exiftool -s -s -s -ProductVersion \
                         "$FIKA_MOD_DIR/FikaServer.dll" | grep -oP '[0-9.]+\+\K.*')
                 fi
-                if [[ "$fika_local_sha" != "$FIKA_REMOTE_SHA" ]]; then
-                    echo "Fika SHA mismatch: local=$fika_local_sha expected=$FIKA_REMOTE_SHA"
+                if [[ "$fika_local_sha" != "$fika_remote_sha" ]]; then
+                    echo "Fika SHA mismatch: local=$fika_local_sha expected=$fika_remote_sha"
                     if [[ "$FIKA_MODE" == "auto-update" ]]; then
                         echo "Auto-updating Fika to $FIKA_VERSION"
                         try_update_fika
