@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-# Install required tools if missing (e.g. on fresh container start with dotnet base image)
+# Install required tools if missing (only on fresh container; skipped on restart)
 if ! command -v jq &>/dev/null || ! command -v 7zz &>/dev/null || ! command -v exiftool &>/dev/null; then
-    echo "Installing required runtime tools..."
-    apt-get update -y -q
-    apt-get install -y -q --no-install-recommends \
+    echo "Installing required runtime tools (first start only)..."
+    DEBIAN_FRONTEND=noninteractive apt-get update -y
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         jq \
