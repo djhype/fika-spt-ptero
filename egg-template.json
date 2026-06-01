@@ -11,7 +11,7 @@
     "description": "Single Player Tarkov (SPT) server with optional Fika multiplayer mod. Based on https://github.com/zhliau/fika-spt-server-docker.",
     "features": null,
     "docker_images": {
-        "ghcr.io/zhliau/fika-spt-server-docker:latest": "latest (SPT 4.x)"
+        "fika-spt-server-docker:latest": "ghcr.io/zhliau/fika-spt-server-docker:latest"
     },
     "file_denylist": [],
     "startup": "bash /home/container/startup.sh",
