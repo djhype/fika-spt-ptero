@@ -230,3 +230,127 @@ validate() {
         esac
     fi
 }
+
+# -----------------------------------------------------------------------
+# Config + Runtime Functions
+# -----------------------------------------------------------------------
+
+spt_listen_on_all_networks() {
+    local http_json=$SPT_DATA_DIR/configs/http.json
+    if [[ ! -f $http_json ]]; then
+        echo "WARNING: $http_json not found, skipping LISTEN_ALL_NETWORKS config"
+        return
+    fi
+    local modified
+    modified="$(jq '.ip = "0.0.0.0" | .backendIp = "0.0.0.0"' "$http_json")"
+    echo -E "${modified}" > "$http_json"
+
+    if [[ -f "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH" ]]; then
+        echo "Applying LISTEN_ALL_NETWORKS to Fika config"
+        local modified_fika
+        modified_fika="$(jq '.server.SPT.http.ip = "0.0.0.0" | .server.SPT.http.backendIp = "0.0.0.0"' \
+            "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH")"
+        echo -E "${modified_fika}" > "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH"
+    fi
+}
+
+set_num_headless_profiles() {
+    if [[ ${NUM_HEADLESS_PROFILES:+1} && -f "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH" ]]; then
+        echo "Setting headless profile count to $NUM_HEADLESS_PROFILES"
+        local modified
+        modified="$(jq --arg n "$NUM_HEADLESS_PROFILES" \
+            '.headless.profiles.amount=($n | tonumber)' \
+            "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH")"
+        echo -E "${modified}" > "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH"
+    fi
+}
+
+install_requested_mods() {
+    echo "Downloading and installing other mods"
+    /usr/bin/download_unzip_install_mods "$SPT_DIR"
+}
+
+start_crond() {
+    echo "Setting up profile backup cron"
+    # Write a custom backup script using /home/container paths.
+    # The runtime image's /usr/bin/backup is hardcoded to /opt/server and cannot be used.
+    cat > /home/container/backup.sh << 'BACKUP_SCRIPT_EOF'
+#!/bin/bash -e
+PROFILES_DIR=/home/container/SPT/user/profiles
+TIMESTAMP=$(date +%Y%m%dT%H%M)
+BACKUP_TARGET=/home/container/backups/profiles/$TIMESTAMP
+echo "Backing up profiles to $BACKUP_TARGET" >> /proc/1/fd/1
+mkdir -p $BACKUP_TARGET
+cp -r $PROFILES_DIR $BACKUP_TARGET
+echo "Backup complete." >> /proc/1/fd/1
+BACKUP_SCRIPT_EOF
+    chmod +x /home/container/backup.sh
+    echo "0 0 * * * root /home/container/backup.sh" > /etc/cron.d/spt_backup
+    chmod 0644 /etc/cron.d/spt_backup
+    /etc/init.d/cron start
+}
+
+set_timezone() {
+    if [[ -n "${TZ}" ]]; then
+        echo $TZ > /etc/timezone
+    else
+        local before_hour
+        before_hour=$(date +"%H")
+        TZ=$(cat /etc/timezone)
+    fi
+    ln -sf /usr/share/zoneinfo/$TZ /etc/localtime
+    if [[ ${before_hour:-} != $(date +"%H") ]]; then
+        echo "Timezone set to $TZ"
+    fi
+}
+
+# -----------------------------------------------------------------------
+# Main
+# -----------------------------------------------------------------------
+
+validate
+
+if [[ ! -f "$SPT_DIR/$SPT_BINARY" ]]; then
+    echo "Server files not found, initializing first boot..."
+    install_spt
+else
+    echo "Found server files at $SPT_DIR, skipping initial install"
+fi
+
+if [[ "$LISTEN_ALL_NETWORKS" == "true" ]]; then
+    spt_listen_on_all_networks
+fi
+
+case "$FIKA_MODE" in
+    install|auto-update)
+        if [[ ! -d "$FIKA_MOD_DIR" ]]; then
+            echo "No Fika mod found (FIKA_MODE=$FIKA_MODE). Installing."
+            install_fika_mod
+        else
+            echo "Fika mod already present, skipping install"
+        fi
+        ;;
+    custom)
+        if [[ ! -d "$FIKA_MOD_DIR" ]]; then
+            echo "WARNING: FIKA_MODE=custom but no Fika mod found at $FIKA_MOD_DIR"
+            echo "Manually install your custom Fika build to that directory."
+        fi
+        ;;
+    disabled)
+        ;;
+esac
+
+set_num_headless_profiles
+
+if [[ "$INSTALL_OTHER_MODS" == "true" ]]; then
+    install_requested_mods
+fi
+
+if [[ "$ENABLE_PROFILE_BACKUP" == "true" ]]; then
+    start_crond
+fi
+
+set_timezone
+
+echo "Starting SPT server..."
+cd "$SPT_DIR" && ./$SPT_BINARY
