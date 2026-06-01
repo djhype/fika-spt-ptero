@@ -1,5 +1,20 @@
 #!/bin/bash -e
 
+# Install required tools if missing (e.g. on fresh container start with dotnet base image)
+if ! command -v jq &>/dev/null || ! command -v 7zz &>/dev/null || ! command -v exiftool &>/dev/null; then
+    echo "Installing required runtime tools..."
+    apt-get update -y -q
+    apt-get install -y -q --no-install-recommends \
+        ca-certificates \
+        curl \
+        jq \
+        p7zip-full \
+        unzip \
+        libimage-exiftool-perl \
+        cron
+    echo "Tools installed"
+fi
+
 # Paths
 MOUNTED_DIR=/home/container
 SPT_DIR=$MOUNTED_DIR/SPT
