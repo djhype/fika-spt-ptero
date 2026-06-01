@@ -144,8 +144,8 @@ install_fika_mod() {
     echo "Installing Fika server mod $FIKA_VERSION"
     mkdir -p "$SPT_DIR/user/mods"
     cd /tmp
-    curl -sL $FIKA_RELEASE_URL -O
-    unzip -q $FIKA_ARTIFACT -d /tmp/fika_temp/
+    curl -sL "$FIKA_RELEASE_URL" -O
+    unzip -q "$FIKA_ARTIFACT" -d /tmp/fika_temp/
     mv /tmp/fika_temp/SPT/user/mods/fika-server "$FIKA_MOD_DIR"
     rm -rf /tmp/fika_temp "/tmp/$FIKA_ARTIFACT"
     echo "Fika installation complete"
