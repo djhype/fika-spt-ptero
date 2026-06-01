@@ -63,18 +63,18 @@ enforce_spt_4_structure() {
     if [[ -f $MOUNTED_DIR/$SPT_BINARY ]]; then
         echo "Enforcing SPT 4.0 directory structure"
         mkdir -p $SPT_DIR
-        for item in $MOUNTED_DIR/*; do
+        for item in "$MOUNTED_DIR"/*; do
             base_item=$(basename "$item")
             if [[ "$base_item" != "SPT" ]]; then
-                mv "$item" $SPT_DIR
+                mv "$item" "$SPT_DIR"
             fi
         done
     fi
 }
 
 make_spt_dirs() {
-    mkdir -p $SPT_DIR/user/mods
-    mkdir -p $SPT_DIR/user/profiles
+    mkdir -p "$SPT_DIR/user/mods"
+    mkdir -p "$SPT_DIR/user/profiles"
 }
 
 install_spt() {
@@ -106,8 +106,8 @@ install_spt() {
 }
 
 backup_spt_user_dirs() {
-    mkdir -p $SPT_BACKUP_DIR
-    cp -r $SPT_DIR/user $SPT_BACKUP_DIR/
+    mkdir -p "$SPT_BACKUP_DIR"
+    cp -r "$SPT_DIR/user" "$SPT_BACKUP_DIR/"
 }
 
 try_update_spt() {
