@@ -135,3 +135,98 @@ try_update_spt() {
     echo "  ==============="
     exit 0
 }
+
+# -----------------------------------------------------------------------
+# Fika Functions
+# -----------------------------------------------------------------------
+
+install_fika_mod() {
+    echo "Installing Fika server mod $FIKA_VERSION"
+    mkdir -p "$SPT_DIR/user/mods"
+    cd /tmp
+    curl -sL $FIKA_RELEASE_URL -O
+    unzip -q $FIKA_ARTIFACT -d /tmp/fika_temp/
+    mv /tmp/fika_temp/SPT/user/mods/fika-server "$FIKA_MOD_DIR"
+    rm -rf /tmp/fika_temp "/tmp/$FIKA_ARTIFACT"
+    echo "Fika installation complete"
+}
+
+backup_fika() {
+    mkdir -p "$FIKA_BACKUP_DIR"
+    cp -r "$FIKA_MOD_DIR" "$FIKA_BACKUP_DIR"
+}
+
+try_update_fika() {
+    echo "Updating Fika server mod to $FIKA_VERSION"
+    backup_fika
+    rm -rf "$FIKA_MOD_DIR"
+    install_fika_mod
+    # Restore previous config if it exists
+    mkdir -p "$FIKA_MOD_DIR/assets/configs"
+    local existing_config=$FIKA_BACKUP_DIR/fika-server/$FIKA_CONFIG_PATH
+    if [[ -f $existing_config ]]; then
+        cp "$existing_config" "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH"
+    fi
+    echo "Successfully updated Fika to $FIKA_VERSION"
+}
+
+# -----------------------------------------------------------------------
+# Validate
+# -----------------------------------------------------------------------
+
+validate() {
+    if [[ ${NUM_HEADLESS_PROFILES:+1} && ! $NUM_HEADLESS_PROFILES =~ ^[0-9]+$ ]]; then
+        echo "NUM_HEADLESS_PROFILES must be an integer. Got: $NUM_HEADLESS_PROFILES"
+        exit 1
+    fi
+
+    enforce_spt_4_structure
+
+    echo "Validating SPT version"
+    if [[ -d $SPT_DATA_DIR ]]; then
+        local existing_version
+        existing_version=$(exiftool -s -s -s -ProductVersion "$SPT_DIR/SPT.Server.dll" \
+            | cut -d '-' -f 1)
+
+        if [[ -n ${FORCE_SPT_VERSION} ]]; then
+            install_spt
+        elif [[ $existing_version != "$SPT_VERSION_SHORT" ]]; then
+            try_update_spt "$existing_version"
+        else
+            echo "SPT version OK: $existing_version"
+        fi
+
+        case "$FIKA_MODE" in
+            custom)
+                echo "Skipping Fika validation (FIKA_MODE=custom)"
+                ;;
+            install|auto-update)
+                local fika_local_sha=""
+                if [[ -f "$FIKA_MOD_DIR/FikaServer.dll" ]]; then
+                    fika_local_sha=$(exiftool -s -s -s -ProductVersion \
+                        "$FIKA_MOD_DIR/FikaServer.dll" | grep -oP '[0-9.]+\+\K.*')
+                fi
+                if [[ "$fika_local_sha" != "$FIKA_REMOTE_SHA" ]]; then
+                    echo "Fika SHA mismatch: local=$fika_local_sha expected=$FIKA_REMOTE_SHA"
+                    if [[ "$FIKA_MODE" == "auto-update" ]]; then
+                        echo "Auto-updating Fika to $FIKA_VERSION"
+                        try_update_fika
+                    else
+                        echo "Fika version mismatch. Set FIKA_MODE=auto-update to auto-update."
+                        echo "Aborting."
+                        exit 1
+                    fi
+                else
+                    echo "Fika version OK"
+                fi
+                ;;
+            disabled)
+                ;;
+            *)
+                echo "Invalid FIKA_MODE: $FIKA_MODE"
+                echo "Valid options: disabled, install, auto-update, custom"
+                exit 1
+                ;;
+        esac
+    fi
+}
