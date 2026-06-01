@@ -1,20 +1,10 @@
 #!/bin/bash
 set -e
 
-# Install required tools if missing (only on fresh container; skipped on restart)
-if ! command -v jq &>/dev/null || ! command -v 7zz &>/dev/null || ! command -v exiftool &>/dev/null; then
-    echo "Installing required runtime tools (first start only)..."
-    DEBIAN_FRONTEND=noninteractive apt-get update -y
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-        jq \
-        p7zip-full \
-        unzip \
-        libimage-exiftool-perl \
-        cron
-    echo "Tools installed"
-fi
+# Tools are pre-copied to /home/container/bin by the install script.
+# The runtime container filesystem is read-only; only /home/container is writable.
+export PATH=/home/container/bin:$PATH
+export LD_LIBRARY_PATH=/home/container/lib:$LD_LIBRARY_PATH
 
 # Paths
 MOUNTED_DIR=/home/container
@@ -47,6 +37,12 @@ LISTEN_ALL_NETWORKS=${LISTEN_ALL_NETWORKS:-true}
 ENABLE_PROFILE_BACKUP=${ENABLE_PROFILE_BACKUP:-true}
 INSTALL_OTHER_MODS=${INSTALL_OTHER_MODS:-false}
 NUM_HEADLESS_PROFILES=${NUM_HEADLESS_PROFILES:+"$NUM_HEADLESS_PROFILES"}
+
+# Pterodactyl sends "1"/"0" for boolean variables; normalise to "true"/"false"
+[[ "$LISTEN_ALL_NETWORKS"  == "1" ]] && LISTEN_ALL_NETWORKS=true
+[[ "$ENABLE_PROFILE_BACKUP" == "1" ]] && ENABLE_PROFILE_BACKUP=true
+[[ "$AUTO_UPDATE_SPT"      == "1" ]] && AUTO_UPDATE_SPT=true
+[[ "$INSTALL_OTHER_MODS"   == "1" ]] && INSTALL_OTHER_MODS=true
 
 # Backwards compatibility for deprecated variables
 INSTALL_FIKA=${INSTALL_FIKA:-}
@@ -117,6 +113,8 @@ install_spt() {
         rm "${MOUNTED_DIR}/spt.7z"
     fi
     make_spt_dirs
+    # Write version marker so validate() doesn't need exiftool for basic checks
+    echo "$SPT_VERSION" > "$SPT_DIR/.spt-version"
 }
 
 backup_spt_user_dirs() {
@@ -159,7 +157,8 @@ install_fika_mod() {
     mkdir -p "$SPT_DIR/user/mods"
     cd /tmp
     curl -sL "$FIKA_RELEASE_URL" -O
-    unzip -q "$FIKA_ARTIFACT" -d /tmp/fika_temp/
+    # Use 7zz to extract (unzip not available; 7-zip handles zip format)
+    7zz x "$FIKA_ARTIFACT" -o/tmp/fika_temp/ -y
     mv /tmp/fika_temp/SPT/user/mods/fika-server "$FIKA_MOD_DIR"
     rm -rf /tmp/fika_temp "/tmp/$FIKA_ARTIFACT"
     echo "Fika installation complete"
@@ -199,8 +198,16 @@ validate() {
     echo "Validating SPT version"
     if [[ -d $SPT_DATA_DIR ]]; then
         local existing_version
-        existing_version=$(exiftool -s -s -s -ProductVersion "$SPT_DIR/SPT.Server.dll" \
-            | cut -d '-' -f 1)
+        # Prefer version marker written by install_spt; fall back to exiftool if available
+        if [[ -f "$SPT_DIR/.spt-version" ]]; then
+            existing_version=$(cut -d '-' -f 1 < "$SPT_DIR/.spt-version")
+        elif command -v exiftool &>/dev/null; then
+            existing_version=$(exiftool -s -s -s -ProductVersion "$SPT_DIR/SPT.Server.dll" \
+                | cut -d '-' -f 1 || echo "unknown")
+        else
+            echo "WARNING: No version info available (.spt-version missing, exiftool absent). Skipping version check."
+            existing_version="$SPT_VERSION_SHORT"
+        fi
 
         if [[ -n ${FORCE_SPT_VERSION} ]]; then
             install_spt
@@ -216,13 +223,15 @@ validate() {
                 ;;
             install|auto-update)
                 local fika_local_sha=""
-                local fika_remote_sha
-                fika_remote_sha=$(curl -s "https://api.github.com/repos/project-fika/Fika-Server-CSharp/git/refs/tags/v$FIKA_VERSION" | grep -oP '"sha":\s*"\K[^"]+' || true)
-                if [[ -f "$FIKA_MOD_DIR/FikaServer.dll" ]]; then
-                    fika_local_sha=$(exiftool -s -s -s -ProductVersion \
-                        "$FIKA_MOD_DIR/FikaServer.dll" | grep -oP '[0-9.]+\+\K.*')
+                local fika_remote_sha=""
+                if command -v curl &>/dev/null; then
+                    fika_remote_sha=$(curl -s "https://api.github.com/repos/project-fika/Fika-Server-CSharp/git/refs/tags/v$FIKA_VERSION" | grep -oP '"sha":\s*"\K[^"]+' || true)
                 fi
-                if [[ "$fika_local_sha" != "$fika_remote_sha" ]]; then
+                if [[ -f "$FIKA_MOD_DIR/FikaServer.dll" ]] && command -v exiftool &>/dev/null; then
+                    fika_local_sha=$(exiftool -s -s -s -ProductVersion \
+                        "$FIKA_MOD_DIR/FikaServer.dll" | grep -oP '[0-9.]+\+\K.*' || true)
+                fi
+                if [[ -n "$fika_remote_sha" && "$fika_local_sha" != "$fika_remote_sha" ]]; then
                     echo "Fika SHA mismatch: local=$fika_local_sha expected=$fika_remote_sha"
                     if [[ "$FIKA_MODE" == "auto-update" ]]; then
                         echo "Auto-updating Fika to $FIKA_VERSION"
@@ -287,9 +296,7 @@ install_requested_mods() {
 }
 
 start_crond() {
-    echo "Setting up profile backup cron"
-    # Write a custom backup script using /home/container paths.
-    # The runtime image's /usr/bin/backup is hardcoded to /opt/server and cannot be used.
+    # Write backup script to server volume (writable)
     cat > /home/container/backup.sh << 'BACKUP_SCRIPT_EOF'
 #!/bin/bash -e
 PROFILES_DIR=/home/container/SPT/user/profiles
@@ -301,23 +308,20 @@ cp -r $PROFILES_DIR $BACKUP_TARGET
 echo "Backup complete." >> /proc/1/fd/1
 BACKUP_SCRIPT_EOF
     chmod +x /home/container/backup.sh
-    echo "0 0 * * * root /home/container/backup.sh" > /etc/cron.d/spt_backup
-    chmod 0644 /etc/cron.d/spt_backup
-    /etc/init.d/cron start
+
+    # /etc/cron.d and /etc/init.d are on the read-only container fs; skip cron registration.
+    # SPT Server has built-in profile backup which replaces this feature.
+    echo "NOTE: cron-based profile backup not available (read-only container fs)."
+    echo "      SPT Server's built-in backup system handles profile backups."
 }
 
 set_timezone() {
     if [[ -n "${TZ}" ]]; then
-        echo "$TZ" > /etc/timezone
+        echo "$TZ" > /etc/timezone 2>/dev/null || true
     else
-        local before_hour
-        before_hour=$(date +"%H")
-        TZ=$(cat /etc/timezone)
+        TZ=$(cat /etc/timezone 2>/dev/null || echo "UTC")
     fi
-    ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime
-    if [[ ${before_hour:-} != $(date +"%H") ]]; then
-        echo "Timezone set to $TZ"
-    fi
+    ln -sf "/usr/share/zoneinfo/$TZ" /etc/localtime 2>/dev/null || true
 }
 
 # -----------------------------------------------------------------------

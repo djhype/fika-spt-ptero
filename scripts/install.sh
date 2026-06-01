@@ -10,6 +10,9 @@ FIKA_VERSION=${FIKA_VERSION:-2.2.6}
 FIKA_MODE=${FIKA_MODE:-disabled}
 LISTEN_ALL_NETWORKS=${LISTEN_ALL_NETWORKS:-true}
 
+# Normalise Pterodactyl boolean values ("1" -> "true")
+[[ "$LISTEN_ALL_NETWORKS" == "1" ]] && LISTEN_ALL_NETWORKS=true
+
 echo "=== SPT + Fika Installer ==="
 echo "SPT_VERSION=$SPT_VERSION"
 echo "FIKA_MODE=$FIKA_MODE"
@@ -17,7 +20,7 @@ echo "FIKA_VERSION=$FIKA_VERSION"
 echo "LISTEN_ALL_NETWORKS=$LISTEN_ALL_NETWORKS"
 echo ""
 
-# Install required tools
+# Install tools needed during install phase
 echo "Installing tools..."
 apt-get update -y -q
 apt-get install -y -q --no-install-recommends \
@@ -28,6 +31,34 @@ apt-get install -y -q --no-install-recommends \
     unzip \
     libimage-exiftool-perl
 echo "Tools installed"
+
+# Copy runtime tools to persistent server volume.
+# The runtime container filesystem is read-only; only /home/container is writable.
+echo "Copying runtime tools to server volume..."
+RUNTIME_BIN=/mnt/server/bin
+RUNTIME_LIB=/mnt/server/lib
+mkdir -p "$RUNTIME_BIN" "$RUNTIME_LIB"
+
+# jq and its shared library dependencies
+cp /usr/bin/jq "$RUNTIME_BIN/"
+ldd /usr/bin/jq 2>/dev/null | grep "=> /" | awk '{print $3}' | while read lib; do
+    cp -n "$lib" "$RUNTIME_LIB/" 2>/dev/null || true
+done
+
+# 7za (renamed to 7zz to match startup.sh expectations)
+cp /usr/bin/7za "$RUNTIME_BIN/7zz"
+ldd /usr/bin/7za 2>/dev/null | grep "=> /" | awk '{print $3}' | while read lib; do
+    cp -n "$lib" "$RUNTIME_LIB/" 2>/dev/null || true
+done
+
+# curl and its shared library dependencies
+cp /usr/bin/curl "$RUNTIME_BIN/"
+ldd /usr/bin/curl 2>/dev/null | grep "=> /" | awk '{print $3}' | while read lib; do
+    cp -n "$lib" "$RUNTIME_LIB/" 2>/dev/null || true
+done
+
+chmod +x "$RUNTIME_BIN"/*
+echo "Runtime tools copied to $RUNTIME_BIN"
 
 # Install SPT if not already present
 # SPT archive extracts with a top-level SPT/ directory, so binary lands at /mnt/server/SPT/SPT.Server.Linux
@@ -42,6 +73,9 @@ else
     mkdir -p "$SPT_DIR/user/mods" "$SPT_DIR/user/profiles"
     echo "SPT installed to $SPT_DIR"
 fi
+
+# Write version marker so startup.sh can check SPT version without exiftool
+echo "$SPT_VERSION" > "$SPT_DIR/.spt-version"
 
 # Install Fika server mod if requested and not already present
 FIKA_MOD_DIR=$SPT_DIR/user/mods/fika-server
