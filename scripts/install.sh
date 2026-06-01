@@ -1,7 +1,8 @@
-#!/bin/bash -e
+#!/bin/bash
 # SPT + Fika Pterodactyl installer
 # Runs in: debian:bookworm-slim
 # Server files destination: /mnt/server (= /home/container at runtime)
+set -e
 
 SPT_DIR=/mnt/server/SPT
 SPT_VERSION=${SPT_VERSION:-4.0.13-40087-2891fd4}
@@ -35,10 +36,9 @@ if [[ -f "$SPT_DIR/SPT.Server.Linux" ]]; then
 else
     echo "Downloading SPT $SPT_VERSION..."
     mkdir -p /mnt/server
-    cd /tmp
-    curl -L "https://spt-releases.modd.in/SPT-${SPT_VERSION}.7z" -o spt.7z
-    7za x spt.7z -o/mnt/server
-    rm spt.7z
+    curl -L "https://spt-releases.modd.in/SPT-${SPT_VERSION}.7z" -o /mnt/server/spt.7z
+    7za x /mnt/server/spt.7z -o/mnt/server
+    rm /mnt/server/spt.7z
     mkdir -p "$SPT_DIR/user/mods" "$SPT_DIR/user/profiles"
     echo "SPT installed to $SPT_DIR"
 fi

@@ -1,4 +1,5 @@
-#!/bin/bash -e
+#!/bin/bash
+set -e
 
 # Install required tools if missing (e.g. on fresh container start with dotnet base image)
 if ! command -v jq &>/dev/null || ! command -v 7zz &>/dev/null || ! command -v exiftool &>/dev/null; then
@@ -111,11 +112,10 @@ install_spt() {
         fi
     else
         rm -rf $SPT_DATA_DIR
-        cd /tmp
         echo "Downloading SPT $SPT_VERSION"
-        curl -sL "https://spt-releases.modd.in/SPT-${SPT_VERSION}.7z" -o spt.7z
-        7zz x spt.7z -o${MOUNTED_DIR} -aoa
-        rm spt.7z
+        curl -sL "https://spt-releases.modd.in/SPT-${SPT_VERSION}.7z" -o "${MOUNTED_DIR}/spt.7z"
+        7zz x "${MOUNTED_DIR}/spt.7z" -o${MOUNTED_DIR} -aoa
+        rm "${MOUNTED_DIR}/spt.7z"
     fi
     make_spt_dirs
 }
