@@ -67,11 +67,14 @@ if [[ "$FIKA_MODE" == "install" || "$FIKA_MODE" == "auto-update" ]]; then
     fi
 fi
 
-# Patch http.json for listen-on-all-interfaces if the config file exists
+# Patch http.json for listen-on-all-interfaces if the config file exists.
+# backendIp (advertised to clients) uses BACKEND_IP when set; startup.sh re-applies
+# this on every boot, so this is just the initial value.
 HTTP_JSON=$SPT_DIR/SPT_Data/configs/http.json
 if [[ "$LISTEN_ALL_NETWORKS" == "true" && -f "$HTTP_JSON" ]]; then
-    echo "Configuring SPT to listen on all network interfaces"
-    modified=$(jq '.ip = "0.0.0.0" | .backendIp = "0.0.0.0"' "$HTTP_JSON")
+    BACKEND_IP=${BACKEND_IP:-0.0.0.0}
+    echo "Configuring SPT to listen on all interfaces (backendIp=$BACKEND_IP)"
+    modified=$(jq --arg ip "$BACKEND_IP" '.ip = "0.0.0.0" | .backendIp = $ip' "$HTTP_JSON")
     echo -E "$modified" > "$HTTP_JSON"
 fi
 

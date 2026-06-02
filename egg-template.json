@@ -158,6 +158,16 @@
             "user_editable": true,
             "rules": "nullable|string|max:50",
             "field_type": "text"
+        },
+        {
+            "name": "Backend IP",
+            "description": "The IP or hostname that game clients use to reach this server (its LAN or public IP, e.g. 192.168.1.50). This is written to SPT's backendIp and advertised to the game client. REQUIRED when the client runs on a different machine than the server. Leave blank only if the client runs on the same host (uses 0.0.0.0).",
+            "env_variable": "BACKEND_IP",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:253",
+            "field_type": "text"
         }
     ]
 }

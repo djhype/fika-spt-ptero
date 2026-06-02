@@ -261,23 +261,31 @@ validate() {
 
 spt_listen_on_all_networks() {
     local server_port=${SERVER_PORT:-6969}
+    # 'ip' is what the server binds to (0.0.0.0 = all interfaces).
+    # 'backendIp' is the address the server advertises to game clients — it MUST be
+    # reachable by the client. For remote clients set BACKEND_IP to the server's
+    # LAN/public IP; if blank, fall back to 0.0.0.0 (only works for a same-host client).
+    local backend_ip=${BACKEND_IP:-0.0.0.0}
     local http_json=$SPT_DATA_DIR/configs/http.json
     if [[ ! -f $http_json ]]; then
         echo "WARNING: $http_json not found, skipping network config"
         return
     fi
     local modified
-    modified="$(jq --arg port "$server_port" \
-        '.ip = "0.0.0.0" | .backendIp = "0.0.0.0" | .port = ($port | tonumber) | .backendPort = ($port | tonumber)' \
+    modified="$(jq --arg ip "$backend_ip" --arg port "$server_port" \
+        '.ip = "0.0.0.0" | .backendIp = $ip | .port = ($port | tonumber) | .backendPort = ($port | tonumber)' \
         "$http_json")"
     echo -E "${modified}" > "$http_json"
-    echo "SPT server configured to listen on 0.0.0.0:$server_port"
+    echo "SPT bound to 0.0.0.0:$server_port; backend advertised to clients as $backend_ip:$server_port"
+    if [[ "$backend_ip" == "0.0.0.0" ]]; then
+        echo "  NOTE: BACKEND_IP is unset — remote clients will fail to connect. Set BACKEND_IP to this server's reachable IP."
+    fi
 
     if [[ -f "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH" ]]; then
         echo "Applying network config to Fika config"
         local modified_fika
-        modified_fika="$(jq --arg port "$server_port" \
-            '.server.SPT.http.ip = "0.0.0.0" | .server.SPT.http.backendIp = "0.0.0.0" | .server.SPT.http.port = ($port | tonumber) | .server.SPT.http.backendPort = ($port | tonumber)' \
+        modified_fika="$(jq --arg ip "$backend_ip" --arg port "$server_port" \
+            '.server.SPT.http.ip = "0.0.0.0" | .server.SPT.http.backendIp = $ip | .server.SPT.http.port = ($port | tonumber) | .server.SPT.http.backendPort = ($port | tonumber)' \
             "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH")"
         echo -E "${modified_fika}" > "$FIKA_MOD_DIR/$FIKA_CONFIG_PATH"
     fi
