@@ -21,17 +21,18 @@ The egg ships everything as a single importable file (`egg-spt-fika.json`) and i
 ## Requirements
 
 - A Pterodactyl panel + Wings node.
-- The custom runtime image published and **public** (see [Runtime image](#runtime-image)).
+- The runtime image — already published at `ghcr.io/djhype/fika-spt-ptero` (public). If you fork this repo, publish your own (see [Runtime image](#runtime-image)).
 
 ---
 
 ## Quick start
 
-1. **Publish the runtime image** (one-time — see [Runtime image](#runtime-image)).
-2. In the panel: **Admin → Nests → Import Egg** → upload `egg-spt-fika.json`.
-3. Create a server using the **SPT + Fika** egg. Set `FIKA_MODE` to `install` or `auto-update` if you want Fika.
-4. The install script downloads SPT (and Fika), then the server starts automatically.
-5. Connect your SPT launcher to `https://<node-ip>:<allocated-port>`.
+1. In the panel: **Admin → Nests → Import Egg** → upload `egg-spt-fika.json` (from the [latest release](https://github.com/djhype/fika-spt-ptero/releases)).
+2. Create a server using the **SPT and Fika** egg.
+   - Set **`BACKEND_IP`** to the IP your players use to reach the server (e.g. its LAN IP). **This is required for remote clients** — see [Connecting clients](#connecting-clients).
+   - Set `FIKA_MODE` to `install` or `auto-update` if you want Fika.
+3. The install script downloads SPT (and Fika), then the server starts automatically.
+4. Point the SPT launcher at `https://<BACKEND_IP>:<allocated-port>`.
 
 ---
 
@@ -39,6 +40,7 @@ The egg ships everything as a single importable file (`egg-spt-fika.json`) and i
 
 | Variable | Default | Description |
 |---|---|---|
+| `BACKEND_IP` | *(empty)* | **Set this for remote clients.** The IP/hostname clients use to reach the server (its LAN or public IP, e.g. `192.168.1.50`). Written to SPT's `backendIp`. Leave blank only if the client runs on the same host. See [Connecting clients](#connecting-clients). |
 | `SPT_VERSION` | `4.0.13-40087-2891fd4` | SPT release string (`VERSION-EFT_BUILD-GIT_SHA`). |
 | `FIKA_VERSION` | `2.2.6` | Fika server mod version. |
 | `FIKA_MODE` | `disabled` | `disabled` / `install` / `auto-update` / `custom`. |
@@ -54,6 +56,17 @@ The egg ships everything as a single importable file (`egg-spt-fika.json`) and i
 | `TZ` | *(empty)* | Timezone (TZ database identifier, e.g. `America/New_York`). |
 
 > The server port is taken automatically from Pterodactyl's primary allocation (`SERVER_PORT`); it is not a user-editable variable.
+
+---
+
+## Connecting clients
+
+SPT has two network settings: `ip` (what the server **binds** to) and `backendIp` (the address the server **advertises** to the game client). The egg always binds to `0.0.0.0`, but the client needs a reachable backend address.
+
+- **Set `BACKEND_IP`** to the address your players use to reach the server (its LAN or public IP).
+- Point the SPT launcher at `https://<BACKEND_IP>:<allocated-port>`.
+
+If `BACKEND_IP` is left blank, `backendIp` falls back to `0.0.0.0`. The launcher will still connect and register, but the game **hard-crashes right after the main menu** because it can't reach `0.0.0.0` for the backend. If you see that, `BACKEND_IP` is almost certainly unset.
 
 ---
 
