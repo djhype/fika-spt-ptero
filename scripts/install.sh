@@ -20,7 +20,7 @@ echo "FIKA_VERSION=$FIKA_VERSION"
 echo "LISTEN_ALL_NETWORKS=$LISTEN_ALL_NETWORKS"
 echo ""
 
-# Install tools needed during install phase
+# Install tools needed during the install phase (runtime tools live in the image)
 echo "Installing tools..."
 apt-get update -y -q
 apt-get install -y -q --no-install-recommends \
@@ -28,37 +28,8 @@ apt-get install -y -q --no-install-recommends \
     curl \
     jq \
     p7zip-full \
-    unzip \
-    libimage-exiftool-perl
+    unzip
 echo "Tools installed"
-
-# Copy runtime tools to persistent server volume.
-# The runtime container filesystem is read-only; only /home/container is writable.
-echo "Copying runtime tools to server volume..."
-RUNTIME_BIN=/mnt/server/bin
-RUNTIME_LIB=/mnt/server/lib
-mkdir -p "$RUNTIME_BIN" "$RUNTIME_LIB"
-
-# jq and its shared library dependencies
-cp /usr/bin/jq "$RUNTIME_BIN/"
-ldd /usr/bin/jq 2>/dev/null | grep "=> /" | awk '{print $3}' | while read lib; do
-    cp -n "$lib" "$RUNTIME_LIB/" 2>/dev/null || true
-done
-
-# 7za (renamed to 7zz to match startup.sh expectations)
-cp /usr/bin/7za "$RUNTIME_BIN/7zz"
-ldd /usr/bin/7za 2>/dev/null | grep "=> /" | awk '{print $3}' | while read lib; do
-    cp -n "$lib" "$RUNTIME_LIB/" 2>/dev/null || true
-done
-
-# curl and its shared library dependencies
-cp /usr/bin/curl "$RUNTIME_BIN/"
-ldd /usr/bin/curl 2>/dev/null | grep "=> /" | awk '{print $3}' | while read lib; do
-    cp -n "$lib" "$RUNTIME_LIB/" 2>/dev/null || true
-done
-
-chmod +x "$RUNTIME_BIN"/*
-echo "Runtime tools copied to $RUNTIME_BIN"
 
 # Install SPT if not already present
 # SPT archive extracts with a top-level SPT/ directory, so binary lands at /mnt/server/SPT/SPT.Server.Linux

@@ -1,10 +1,9 @@
 #!/bin/bash
 set -e
 
-# Tools are pre-copied to /home/container/bin by the install script.
-# The runtime container filesystem is read-only; only /home/container is writable.
-export PATH=/home/container/bin:$PATH
-export LD_LIBRARY_PATH=/home/container/lib:$LD_LIBRARY_PATH
+# Runtime tools (jq, 7zz, curl, exiftool, unzip, tar) and the .NET 9 ASP.NET
+# runtime are provided by the custom image (ghcr.io/<owner>/spt-fika-ptero).
+# The container root filesystem is read-only; only /home/container is writable.
 
 # Paths
 MOUNTED_DIR=/home/container

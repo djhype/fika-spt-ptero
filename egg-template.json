@@ -11,7 +11,7 @@
     "description": "Single Player Tarkov (SPT) server with optional Fika multiplayer mod. Based on https://github.com/zhliau/fika-spt-server-docker.",
     "features": null,
     "docker_images": {
-        ".NET 9 ASP.NET (bookworm-slim)": "mcr.microsoft.com/dotnet/aspnet:9.0-bookworm-slim"
+        "SPT + Fika (.NET 9, Pterodactyl)": "ghcr.io/OWNER/spt-fika-ptero:latest"
     },
     "file_denylist": [],
     "startup": "bash /home/container/startup.sh",
