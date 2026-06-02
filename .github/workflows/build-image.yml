@@ -18,9 +18,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Lowercase owner for image name
+      - name: Compute lowercased image name
         id: vars
-        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -35,4 +35,4 @@ jobs:
           context: ./image
           push: true
           tags: |
-            ghcr.io/${{ steps.vars.outputs.owner }}/spt-fika-ptero:latest
+            ${{ steps.vars.outputs.image }}:latest

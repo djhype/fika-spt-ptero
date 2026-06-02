@@ -2,7 +2,7 @@
 set -e
 
 # Runtime tools (jq, 7zz, curl, exiftool, unzip, tar) and the .NET 9 ASP.NET
-# runtime are provided by the custom image (ghcr.io/<owner>/spt-fika-ptero).
+# runtime are provided by the custom image (ghcr.io/djhype/fika-spt-ptero).
 # The container root filesystem is read-only; only /home/container is writable.
 
 # Paths
